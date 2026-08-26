@@ -42,7 +42,7 @@ scripts/
 
 1. **Navbar still slow on low-end Android** — the Logs interval is gated on `active` now, but Settings' auto-save fires on every draft change. On slow devices, rapid typing in text inputs triggers many saves. Consider: (a) longer debounce for text fields, or (b) save only on blur for text inputs.
 
-2. **The JNI spam is partially fixed** (filtered at logger level) but may still show if `jni::` target leaks through other paths. The consecutive-duplicate suppression handles it, but verify on a real device.
+2. **JNI spam** — filtered at logger level and the global filter is now `Debug`, so TRACE callsites no longer format args just to be dropped. Verify on a real device.
 
 3. **Settings UX**: the auto-save "saved" badge at the top may be jarring — consider a subtle toast or just the badge briefly visible.
 
@@ -77,4 +77,4 @@ npm run tauri android build -- --apk --target aarch64 --target armv7
 
 ## Version
 
-Current: 0.1.2 (tagged, released). When you push to main, CI builds. Tag `v0.1.3` to release.
+Current: 0.1.3 (tagged, released). When you push to main, CI builds. Tag `v0.1.4` to release.

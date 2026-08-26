@@ -34,11 +34,13 @@ function PowerIcon({ size = 44 }: { size?: number }) {
 }
 
 export default function Home({
+  active,
   status,
   busy,
   onToggle,
   onOpenSettings,
 }: {
+  active: boolean;
   status: EngineStatus;
   busy: boolean;
   onToggle: () => void;
@@ -48,12 +50,17 @@ export default function Home({
   const [uptime, setUptime] = useState("");
   const [settings, setSettings] = useState<NetherSettings | null>(null);
 
+  // This view never unmounts, so re-read on every activation — otherwise the
+  // address cards keep showing the ports the app started with.
   useEffect(() => {
-    api.getSettings().then(setSettings).catch(() => {});
-  }, []);
+    if (active) api.getSettings().then(setSettings).catch(() => {});
+  }, [active]);
 
   useEffect(() => {
-    if (!connected || !status.connectedSinceMs) return;
+    if (!connected || !status.connectedSinceMs) {
+      setUptime("");
+      return;
+    }
     const tick = () => setUptime(formatUptime(status.connectedSinceMs!));
     tick();
     const id = setInterval(tick, 1000);

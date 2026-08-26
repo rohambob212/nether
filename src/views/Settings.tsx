@@ -103,8 +103,9 @@ export default function Settings() {
   function opt(key: keyof NetherSettings) {
     return {
       value: (d[key] as string | null) ?? "",
+      // No trim here: it ate spaces as you typed. normalized() trims on save.
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-        const v = e.target.value.trim();
+        const v = e.target.value;
         set(key, v === "" ? null : v);
       },
     };
@@ -121,8 +122,12 @@ export default function Settings() {
   function port(key: "socksPort" | "httpProxyPort" | "xraySocksPort") {
     return {
       value: d[key],
-      onChange: (v: string | number) =>
-        set(key, Math.max(1, Math.min(65535, Number(v) || 1))),
+      min: 1,
+      max: 65535,
+      clampBehavior: "blur" as const,
+      // Ignore the transient empty value so clearing the field to retype a port
+      // doesn't snap it to 1 (and auto-save that).
+      onChange: (v: string | number) => v !== "" && set(key, Number(v)),
       w: 110,
     };
   }

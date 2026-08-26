@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { api, type EngineStatus } from "./api";
+import { api, onStatus, type EngineStatus } from "./api";
 import { UnstyledButton } from "@mantine/core";
 import Home from "./views/Home";
 import Logs from "./views/Logs";
@@ -46,12 +46,16 @@ export default function App() {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let dead = false;
     api.getStatus().then(setStatus).catch(() => {});
     api.appInfo().then((i) => setVersion(i.version)).catch(() => {});
-    import("./api").then(({ onStatus }) =>
-      onStatus(setStatus).then((u) => (unlisten = u))
-    );
-    return () => unlisten?.();
+    // StrictMode remounts this effect; drop a listener that resolves late or
+    // it stays subscribed forever and every status arrives twice.
+    onStatus(setStatus).then((u) => (dead ? u() : (unlisten = u)));
+    return () => {
+      dead = true;
+      unlisten?.();
+    };
   }, []);
 
   const busy = status.state === "connecting" || status.state === "disconnecting";
@@ -79,6 +83,7 @@ export default function App() {
       <main className="content">
         <div className="view" data-active={tab === "home"}>
           <Home
+            active={tab === "home"}
             status={status}
             busy={busy}
             onToggle={toggle}

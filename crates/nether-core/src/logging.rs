@@ -59,7 +59,10 @@ pub fn install(capacity: usize) -> &'static LogHub {
     let hub = HUB.get_or_init(|| init_hub(capacity));
 
     let _ = log::set_boxed_logger(Box::new(HubLogger));
-    log::set_max_level(log::LevelFilter::Trace);
+    // Records above Debug are dropped by HubLogger::enabled anyway; keeping the
+    // global filter at Trace made every callsite format args just to throw them
+    // away — the jni:: flood on Android went through that path.
+    log::set_max_level(log::LevelFilter::Debug);
     hub
 }
 

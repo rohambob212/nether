@@ -26,11 +26,15 @@ export default function Logs({ active }: { active: boolean }) {
       force((n) => n + 1);
     });
     let unlisten: (() => void) | undefined;
+    let dead = false;
     onLog((rec) => {
       buffer.current.push(rec);
       if (buffer.current.length > 5000) buffer.current.splice(0, 1000);
-    }).then((u) => (unlisten = u));
-    return () => unlisten?.();
+    }).then((u) => (dead ? u() : (unlisten = u)));
+    return () => {
+      dead = true;
+      unlisten?.();
+    };
   }, []);
 
   // Only re-render at 4 Hz when this tab is actually visible.
@@ -44,11 +48,14 @@ export default function Logs({ active }: { active: boolean }) {
     filter === "all" ? buffer.current : buffer.current.filter((r) => r.level === filter)
   ).slice(-RENDER_CAP);
 
+  // No dep array: once the list is capped, shown.length stops changing and a
+  // length-keyed effect would silently stop following the tail. Renders are
+  // already throttled to 4 Hz and only happen while this tab is active.
   useEffect(() => {
     if (autoscroll && listEl.current) {
       listEl.current.scrollTop = listEl.current.scrollHeight;
     }
-  }, [shown.length, autoscroll]);
+  });
 
   function ts(ms: number): string {
     const d = new Date(ms);
