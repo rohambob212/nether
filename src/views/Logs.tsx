@@ -13,7 +13,7 @@ const LEVEL_COLOR: Record<string, string> = {
   trace: "gray",
 };
 
-export default function Logs() {
+export default function Logs({ active }: { active: boolean }) {
   const [filter, setFilter] = useState("all");
   const [autoscroll, setAutoscroll] = useState(true);
   const buffer = useRef<LogRecord[]>([]);
@@ -30,13 +30,15 @@ export default function Logs() {
       buffer.current.push(rec);
       if (buffer.current.length > 5000) buffer.current.splice(0, 1000);
     }).then((u) => (unlisten = u));
-    // Batch re-renders so a burst of log lines doesn't jank the UI.
-    const id = setInterval(() => force((n) => n + 1), 250);
-    return () => {
-      clearInterval(id);
-      unlisten?.();
-    };
+    return () => unlisten?.();
   }, []);
+
+  // Only re-render at 4 Hz when this tab is actually visible.
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => force((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [active]);
 
   const shown = (
     filter === "all" ? buffer.current : buffer.current.filter((r) => r.level === filter)

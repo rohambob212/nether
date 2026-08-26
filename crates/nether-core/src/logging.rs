@@ -122,8 +122,9 @@ struct HubLogger;
 
 impl log::Log for HubLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        // Capture everything; filtering happens in the UI.
-        metadata.level() <= log::Level::Trace
+        // Drop TRACE and noisy JNI internals — the UI filter is separate.
+        metadata.level() <= log::Level::Debug
+            && !metadata.target().starts_with("jni::")
     }
 
     fn log(&self, record: &log::Record) {

@@ -86,7 +86,7 @@ export default function App() {
           />
         </div>
         <div className="view" data-active={tab === "logs"}>
-          <Logs />
+          <Logs active={tab === "logs"} />
         </div>
         <div className="view" data-active={tab === "settings"}>
           <Settings />
