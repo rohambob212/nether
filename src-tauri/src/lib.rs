@@ -23,6 +23,9 @@ struct AppState {
     data_dir: PathBuf,
     /// The bundled Xray sidecar process when smart routing is active.
     xray_child: Mutex<Option<CommandChild>>,
+    /// The tun2socks pump when VPN mode is active (Android only).
+    #[cfg(target_os = "android")]
+    vpn_task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 fn identity_paths(data_dir: &std::path::Path) -> IdentityPaths {
@@ -141,6 +144,103 @@ fn stop_xray(app: &AppHandle) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// VPN mode (Android)
+// ---------------------------------------------------------------------------
+
+/// MTU advertised on the TUN. Aether's own tunnel carries 1280, and IPv6
+/// guarantees that much everywhere, so anything larger just invites a UDP
+/// datagram that cannot fit downstream.
+#[cfg(target_os = "android")]
+const VPN_MTU: u16 = 1280;
+
+/// Bring up the device-wide tunnel and start pumping its packets into the
+/// local SOCKS proxy. No-op unless VPN mode is on and nothing is running yet.
+#[cfg(target_os = "android")]
+fn start_vpn(app: &AppHandle, settings: &NetherSettings) {
+    use tauri_plugin_nethervpn::{NetherVpnExt, StartConfig};
+
+    let state = app.state::<AppState>();
+    let mut guard = state.vpn_task.lock().unwrap();
+    if guard.is_some() {
+        return;
+    }
+
+    // Smart routing never runs on mobile (the Xray sidecar is dropped from the
+    // Android bundle), so the tunnel's own SOCKS port is always the target.
+    let proxy = match format!("{}:{}", settings.socks_host, settings.socks_port).parse() {
+        Ok(addr) => addr,
+        Err(e) => {
+            log::error!("[nether] vpn: bad proxy address: {e}");
+            return;
+        }
+    };
+
+    let config = StartConfig {
+        mtu: VPN_MTU,
+        dns: settings.dns_resolvers.clone(),
+        ipv6: !matches!(settings.ip_version, nether_core::IpVersion::V4),
+    };
+
+    let fd = match app.nether_vpn().start(config) {
+        Ok(fd) => fd,
+        Err(e) => {
+            log::error!("[nether] vpn: could not establish tunnel: {e}");
+            return;
+        }
+    };
+
+    // SAFETY: the descriptor was detached from its ParcelFileDescriptor on the
+    // Kotlin side, so this task is its only owner.
+    *guard = Some(tauri::async_runtime::spawn(async move {
+        if let Err(e) = unsafe { nether_core::vpn::run(fd, proxy, VPN_MTU) }.await {
+            log::error!("[nether] vpn stopped: {e}");
+        }
+    }));
+    log::info!("[nether] vpn mode active");
+}
+
+/// Tear the device-wide tunnel down. Aborting the pump closes the descriptor,
+/// which is what actually drops the interface; the service stop is cleanup.
+#[cfg(target_os = "android")]
+fn stop_vpn(app: &AppHandle) {
+    use tauri_plugin_nethervpn::NetherVpnExt;
+
+    let task = {
+        let state = app.state::<AppState>();
+        let mut guard = state.vpn_task.lock().unwrap();
+        guard.take()
+    };
+    if let Some(task) = task {
+        task.abort();
+        if let Err(e) = app.nether_vpn().stop() {
+            log::warn!("[nether] vpn: service stop failed: {e}");
+        }
+        log::info!("[nether] vpn mode off");
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn start_vpn(_app: &AppHandle, _settings: &NetherSettings) {}
+
+#[cfg(not(target_os = "android"))]
+fn stop_vpn(_app: &AppHandle) {}
+
+/// Ask Android for VPN consent. Called when the user flips the Settings
+/// switch, so the system dialog lands on a deliberate gesture.
+#[tauri::command]
+async fn vpn_prepare(_app: AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_nethervpn::NetherVpnExt;
+        _app.nether_vpn().prepare()
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err("VPN mode is only available on Android".into())
+    }
+}
+
 /// Start the full stack: Aether tunnel plus the optional smart-routing layer.
 fn do_connect(app: &AppHandle) -> Result<EngineStatus, String> {
     let state = app.state::<AppState>();
@@ -169,6 +269,7 @@ async fn connect(app: AppHandle) -> Result<EngineStatus, String> {
 
 #[tauri::command]
 async fn disconnect(app: AppHandle) -> Result<EngineStatus, String> {
+    stop_vpn(&app);
     stop_xray(&app);
     let settings = app.state::<AppState>().settings.lock().unwrap().clone();
     app.state::<AppState>().manager.stop(&settings);
@@ -266,6 +367,17 @@ fn spawn_status_forwarder(app: AppHandle) {
         loop {
             match rx.recv().await {
                 Ok(status) => {
+                    // VPN mode follows the tunnel: the TUN only makes sense
+                    // once SOCKS is actually accepting, and must come down
+                    // when it stops (including an engine-side reconnect).
+                    let settings = app.state::<AppState>().settings.lock().unwrap().clone();
+                    if settings.vpn_mode {
+                        if status.state == nether_core::EngineState::Connected {
+                            start_vpn(&app, &settings);
+                        } else {
+                            stop_vpn(&app);
+                        }
+                    }
                     if app.emit(STATUS_EVENT, &status).is_err() {
                         break;
                     }
@@ -283,9 +395,17 @@ pub fn run() {
     // env_logger try_init() becomes a no-op and its output lands in our hub.
     nether_core::logging::install(LOG_HISTORY_CAP);
 
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_shell::init());
+
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(tauri_plugin_nethervpn::init());
+    }
+
+    builder
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -300,6 +420,8 @@ pub fn run() {
                 settings,
                 data_dir,
                 xray_child: Mutex::new(None),
+                #[cfg(target_os = "android")]
+                vpn_task: Mutex::new(None),
             });
 
             let handle = app.handle().clone();
@@ -337,12 +459,14 @@ pub fn run() {
             save_settings,
             recent_logs,
             clear_logs,
-            app_info
+            app_info,
+            vpn_prepare
         ])
         .build(tauri::generate_context!())
         .expect("error while building Nether")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                stop_vpn(app);
                 stop_xray(app);
             }
         });

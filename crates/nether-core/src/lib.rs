@@ -5,6 +5,8 @@ pub mod engine;
 pub mod gate;
 pub mod logging;
 pub mod settings;
+#[cfg(all(unix, feature = "vpn"))]
+pub mod vpn;
 pub mod xray;
 
 pub use engine::{EngineManager, EngineState, EngineStatus};

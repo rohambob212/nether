@@ -13,6 +13,8 @@ default = ["engine-aether"]
 engine-aether = ["dep:aether", "tokio/rt-multi-thread"]
 # Simulated engine for UI development without the heavy native toolchain.
 engine-mock = []
+# Device-wide VPN (tun2socks). Unix only; Android is the real consumer.
+vpn = ["dep:ipstack", "dep:libc", "tokio/macros"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
@@ -23,3 +25,7 @@ serde.workspace = true
 serde_json.workspace = true
 log.workspace = true
 tokio = { workspace = true, features = ["rt", "sync", "time", "net", "io-util"] }
+
+[target.'cfg(unix)'.dependencies]
+ipstack = { version = "1", optional = true }
+libc = { version = "0.2", optional = true }

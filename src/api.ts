@@ -35,6 +35,7 @@ export interface NetherSettings {
   quickReconnect: boolean;
   autoConnect: boolean;
   alwaysOn: boolean;
+  vpnMode: boolean;
   socksHost: string;
   socksPort: number;
   httpProxyEnabled: boolean;
@@ -77,6 +78,7 @@ export const DEFAULT_SETTINGS: NetherSettings = {
   quickReconnect: true,
   autoConnect: false,
   alwaysOn: false,
+  vpnMode: false,
   socksHost: "127.0.0.1",
   socksPort: 1819,
   httpProxyEnabled: false,
@@ -139,6 +141,10 @@ export const LOG_LEVELS: { value: LogLevel; label: string }[] = [
   { value: "trace", label: "Trace (noisy)" },
 ];
 
+/// VPN mode needs Android's VpnService; the webview UA is the cheapest way to
+/// know which platform we are on without pulling in the os plugin.
+export const IS_ANDROID = /android/i.test(navigator.userAgent);
+
 export const api = {
   connect: (): Promise<EngineStatus> => invoke("connect"),
   disconnect: (): Promise<EngineStatus> => invoke("disconnect"),
@@ -149,6 +155,8 @@ export const api = {
   recentLogs: (limit?: number): Promise<LogRecord[]> => invoke("recent_logs", { limit }),
   clearLogs: (): Promise<void> => invoke("clear_logs"),
   appInfo: (): Promise<{ name: string; version: string }> => invoke("app_info"),
+  /// Ask Android for VPN consent. Resolves false if the user declines.
+  vpnPrepare: (): Promise<boolean> => invoke("vpn_prepare"),
   copyText: (text: string): Promise<void> =>
     import("@tauri-apps/plugin-clipboard-manager").then((m) => m.writeText(text)),
 };

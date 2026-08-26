@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-nethervpn"
+description = "Device-wide VPN mode for Nether via Android VpnService"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# tauri-plugin uses `links` to locate the plugin's mobile project.
+links = "tauri-plugin-nethervpn"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true

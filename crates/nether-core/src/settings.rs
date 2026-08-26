@@ -200,6 +200,9 @@ pub struct NetherSettings {
     /// Keep the tunnel core running across connect/disconnect cycles; only
     /// the user-facing proxy port is toggled.
     pub always_on: bool,
+    /// Capture the whole device through the tunnel instead of only apps that
+    /// were pointed at the SOCKS port. Android only — it needs VpnService.
+    pub vpn_mode: bool,
 
     // -- network ---------------------------------------------------------
     pub socks_host: String,
@@ -264,6 +267,7 @@ impl Default for NetherSettings {
             quick_reconnect: true,
             auto_connect: false,
             always_on: false,
+            vpn_mode: false,
             socks_host: "127.0.0.1".into(),
             socks_port: 1819,
             http_proxy_enabled: false,

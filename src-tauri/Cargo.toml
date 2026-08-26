@@ -23,6 +23,12 @@ log.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 nether-core = { path = "../crates/nether-core" }
 
+# VPN mode is Android-only: the plugin wraps VpnService, and the tun2socks
+# engine needs a descriptor only VpnService can hand out.
+[target.'cfg(target_os = "android")'.dependencies]
+tauri-plugin-nethervpn = { path = "../crates/tauri-plugin-nethervpn" }
+nether-core = { path = "../crates/nether-core", features = ["vpn"] }
+
 [features]
 default = ["engine-aether", "custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

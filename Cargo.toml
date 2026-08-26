@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/nether-core", "src-tauri"]
+members = ["crates/nether-core", "crates/tauri-plugin-nethervpn", "src-tauri"]
 # Vendored Aether checkout must resolve its own workspace (it has no
 # [workspace] table and would otherwise be adopted by this one).
 exclude = ["third_party"]
