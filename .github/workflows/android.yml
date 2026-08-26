@@ -21,7 +21,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android armv7-linux-androideabi
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -45,19 +45,22 @@ jobs:
       - name: Generate android project
         run: npm run tauri android init
 
-      - name: Build signed APK
-        env:
-          TAURI_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/ci.jks
-          TAURI_ANDROID_KEYSTORE_PASSWORD: nether-ci
-          TAURI_ANDROID_KEY_ALIAS: nether
-          TAURI_ANDROID_KEY_PASSWORD: nether-ci
+      # Stamp the pixel-portal launcher icon into the freshly generated
+      # android res/ (tauri icon writes the mipmaps when gen/android exists).
+      - name: Apply launcher icon
+        run: npm run tauri icon icons/nether-1024.png
+
+      - name: Build signed APKs (arm64 + armv7)
         run: |
           keytool -genkeypair -v \
             -keystore ci.jks -storepass nether-ci \
             -alias nether -keypass nether-ci \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Nether CI, OU=Nether, O=Nether, L=Internet, C=US"
-          npm run tauri android build -- --apk --target aarch64
+          # Consumed by the generated app/build.gradle.kts release signingConfig.
+          printf 'storeFile=%s/ci.jks\nstorePassword=nether-ci\nkeyAlias=nether\nkeyPassword=nether-ci\n' \
+            "$GITHUB_WORKSPACE" > src-tauri/gen/android/keystore.properties
+          npm run tauri android build -- --apk --target aarch64 --target armv7
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
