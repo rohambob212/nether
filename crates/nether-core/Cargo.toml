@@ -1,0 +1,25 @@
+[package]
+name = "nether-core"
+description = "Engine, settings and logging core for Nether, the Aether GUI client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["engine-aether"]
+# Link Aether as an in-process Rust library. Requires third_party/Aether to be
+# cloned next to this workspace (see scripts/setup-deps.sh) plus a C/C++
+# toolchain with CMake and Go for BoringSSL.
+engine-aether = ["dep:aether", "tokio/rt-multi-thread"]
+# Simulated engine for UI development without the heavy native toolchain.
+engine-mock = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[dependencies]
+aether = { path = "../../third_party/Aether/aether", optional = true }
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+tokio = { workspace = true, features = ["rt", "sync", "time", "net", "io-util"] }

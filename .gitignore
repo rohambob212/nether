@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/gen/schemas
+src-tauri/gen/android/
+src-tauri/binaries/
+src-tauri/resources/xray/
+third_party/
+*.log
+.DS_Store

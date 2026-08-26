@@ -1,0 +1,30 @@
+[package]
+name = "nether"
+description = "Nether — a multi-platform GUI client for Aether"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+default-run = "nether"
+
+[lib]
+name = "nether_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-shell = "2"
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+nether-core = { path = "../crates/nether-core" }
+
+[features]
+default = ["engine-aether", "custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+engine-aether = ["nether-core/engine-aether"]
+mock-engine = ["nether-core/engine-mock"]
