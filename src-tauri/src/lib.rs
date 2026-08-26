@@ -277,6 +277,7 @@ fn spawn_status_forwarder(app: AppHandle) {
     });
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // The hub logger must be installed before anything else so Aether's own
     // env_logger try_init() becomes a no-op and its output lands in our hub.
