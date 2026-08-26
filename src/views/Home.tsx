@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Alert, Badge, Code, CopyButton, Group, Paper, Stack, Text } from "@mantine/core";
 import { api, type EngineStatus, type NetherSettings } from "../api";
 
 function formatUptime(sinceMs: number): string {
@@ -7,6 +8,13 @@ function formatUptime(sinceMs: number): string {
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
+
+const BADGE_COLOR: Record<string, string> = {
+  connected: "green",
+  connecting: "grape",
+  disconnecting: "grape",
+  disconnected: "gray",
+};
 
 export default function Home({
   status,
@@ -36,73 +44,98 @@ export default function Home({
   }, [connected, status.connectedSinceMs]);
 
   const label =
-    status.state === "disconnected" ? "CONNECT"
-    : status.state === "connecting" ? (status.phase ?? "CONNECTING").toUpperCase()
-    : status.state === "disconnecting" ? "DISCONNECTING"
-    : "DISCONNECT";
+    status.state === "disconnected" ? "Offline"
+    : status.state === "connecting" ? status.phase ?? "Connecting…"
+    : status.state === "disconnecting" ? "Disconnecting…"
+    : "Connected";
 
   const errored = !!status.detail && /error|failed|\[-\]/i.test(status.detail);
   const smart = settings?.smartRouting ?? false;
   const tunnelAddr = settings ? `${settings.socksHost}:${settings.socksPort}` : null;
   const masterAddr = settings && smart ? `${settings.socksHost}:${settings.xraySocksPort}` : null;
 
+  function AddrCard({ labelText, addr }: { labelText: string; addr: string }) {
+    return (
+      <Paper withBorder radius="md" p="md" bg="dark.7">
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" lh={1.4} mb={6}>
+          {labelText}
+        </Text>
+        <Group gap="xs" wrap="nowrap">
+          <Code flex={1} style={{ overflowWrap: "anywhere" }}>{addr}</Code>
+          <CopyButton value={addr}>
+            {({ copied, copy }) => (
+              <Text
+                component="button"
+                c={copied ? "green.4" : "grape.3"}
+                size="xs"
+                fw={700}
+                onClick={copy}
+                style={{ background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}
+              >
+                {copied ? "COPIED" : "COPY"}
+              </Text>
+            )}
+          </CopyButton>
+        </Group>
+      </Paper>
+    );
+  }
+
   return (
-    <div className="home">
-      <button
-        className={`portal-ring ${status.state}`}
-        onClick={onToggle}
-        disabled={busy}
-      >
-        <span className="ring-inner">{connected ? "\u25A0 STOP" : "\u25B6 START"}</span>
+    <Stack align="center" gap="lg" pt="xl" pb="xl" px="md" maw={640} mx="auto">
+      <button className={`portal-btn ${status.state}`} onClick={onToggle} disabled={busy}>
+        <img src="/portal.png" alt="" />
+        <span className="portal-label">
+          {connected ? "DISCONNECT" : busy ? "…" : "CONNECT"}
+        </span>
       </button>
 
-      <div className="state-line">
-        <span className={`state-text ${status.state}`}>{label}</span>
-        {uptime && <span className="uptime">{uptime}</span>}
-      </div>
+      <Group gap="sm">
+        <Badge size="lg" variant="light" color={BADGE_COLOR[status.state]} tt="capitalize">
+          {label}
+        </Badge>
+        {uptime && (
+          <Text size="sm" c="dimmed" ff="monospace">{uptime}</Text>
+        )}
+      </Group>
 
-      {connected && (masterAddr ?? tunnelAddr) && (
-        <div className="info-grid">
-          {masterAddr && (
-            <div className="info-card">
-              <div className="info-label">PROXY — SMART ROUTING</div>
-              <div className="info-value mono">
-                {masterAddr}
-                <button className="mini-btn" onClick={() => api.copyText(masterAddr).catch(() => {})}>
-                  COPY
-                </button>
-              </div>
-            </div>
-          )}
+      {(masterAddr ?? tunnelAddr) && (
+        <Stack gap="sm" w="100%">
+          {masterAddr && <AddrCard labelText="Proxy — smart routing" addr={masterAddr} />}
           {tunnelAddr && (
-            <div className="info-card">
-              <div className="info-label">{smart ? "RAW TUNNEL" : "SOCKS5 PROXY"}</div>
-              <div className="info-value mono">
-                {tunnelAddr}
-                <button className="mini-btn" onClick={() => api.copyText(tunnelAddr).catch(() => {})}>
-                  COPY
-                </button>
-              </div>
-            </div>
+            <AddrCard labelText={smart ? "Raw tunnel" : "SOCKS5 proxy"} addr={tunnelAddr} />
           )}
           {status.gateway && (
-            <div className="info-card">
-              <div className="info-label">GATEWAY</div>
-              <div className="info-value mono">{status.gateway}</div>
-            </div>
+            <Paper withBorder radius="md" p="md" bg="dark.7">
+              <Text size="xs" fw={700} c="dimmed" tt="uppercase" lh={1.4} mb={6}>
+                Gateway
+              </Text>
+              <Code style={{ overflowWrap: "anywhere" }}>{status.gateway}</Code>
+            </Paper>
           )}
-        </div>
+        </Stack>
       )}
 
-      {status.detail && <p className={`detail ${errored ? "err" : ""}`}>{status.detail}</p>}
+      {status.detail && (
+        <Alert
+          w="100%"
+          variant="light"
+          color={errored ? "red" : "grape"}
+          icon={errored ? "✕" : "ℹ"}
+          ff="monospace"
+          fz="sm"
+        >
+          {status.detail}
+        </Alert>
+      )}
 
-      <p className="hint">
+      <Text size="sm" c="dimmed" ta="center" maw={420}>
         Route your apps through the SOCKS5 proxy above. Tune the connection in{" "}
-        <a href="#" onClick={(e) => { e.preventDefault(); onOpenSettings(); }}>
+        <Text component="a" href="#" c="grape.3" onClick={(e) => { e.preventDefault(); onOpenSettings(); }} style={{ textDecoration: "none" }}>
           Settings
-        </a>
+        </Text>
         .
-      </p>
-    </div>
+      </Text>
+    </Stack>
   );
 }

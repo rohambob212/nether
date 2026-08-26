@@ -1,4 +1,18 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
+import {
+  Badge,
+  Button,
+  Group,
+  NumberInput,
+  Paper,
+  PasswordInput,
+  SegmentedControl,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  TextInput,
+} from "@mantine/core";
 import {
   api,
   DEFAULT_SETTINGS,
@@ -10,15 +24,34 @@ import {
   type NetherSettings,
 } from "../api";
 
-function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="row">
-      <div className="row-label">
-        <span>{label}</span>
-        {hint && <small>{hint}</small>}
-      </div>
-      <div className="row-control">{children}</div>
-    </div>
+    <Paper withBorder radius="md" p="md" bg="dark.7">
+      <Text size="xs" fw={700} c="grape.3" tt="uppercase" mb="xs">
+        {title}
+      </Text>
+      <Stack gap="sm">{children}</Stack>
+    </Paper>
+  );
+}
+
+function Row({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Group justify="space-between" align="center" gap="md" wrap="wrap">
+      <Stack gap={2} style={{ flex: "1 1 200px" }}>
+        <Text size="sm" fw={500}>{label}</Text>
+        {hint && <Text size="xs" c="dimmed">{hint}</Text>}
+      </Stack>
+      <Group gap="sm" style={{ flexShrink: 0 }}>{children}</Group>
+    </Group>
   );
 }
 
@@ -31,7 +64,7 @@ export default function Settings() {
     api.getSettings().then(setDraft).catch(() => setDraft(DEFAULT_SETTINGS));
   }, []);
 
-  if (!draft) return <div className="settings-loading">loading…</div>;
+  if (!draft) return <Text c="dimmed" ta="center" pt="xl">loading…</Text>;
   const d = draft;
 
   function set<K extends keyof NetherSettings>(key: K, value: NetherSettings[K]) {
@@ -53,10 +86,17 @@ export default function Settings() {
   function num(key: keyof NetherSettings) {
     return {
       value: (d[key] as number | null) ?? "",
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-        const v = e.target.value;
-        set(key, v === "" ? null : Math.max(0, Math.floor(Number(v) || 0)));
-      },
+      onChange: (v: string | number) =>
+        set(key, v === "" ? null : Math.max(0, Math.floor(Number(v) || 0))),
+    };
+  }
+
+  function port(key: "socksPort" | "httpProxyPort" | "xraySocksPort") {
+    return {
+      value: d[key],
+      onChange: (v: string | number) =>
+        set(key, Math.max(1, Math.min(65535, Number(v) || 1))),
+      w: 110,
     };
   }
 
@@ -72,259 +112,211 @@ export default function Settings() {
   }
 
   return (
-    <div className="settings">
-      <section>
-        <h2>Connection</h2>
+    <Stack gap="md" maw={680} mx="auto" p="md" pb={40}>
+      <Section title="Connection">
         <Row label="Protocol">
-          <div className="card-row">
-            {PROTOCOLS.map((p) => (
-              <button
-                key={p.value}
-                title={p.hint}
-                className={`card ${d.protocol === p.value ? "selected" : ""}`}
-                onClick={() => set("protocol", p.value)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            data={PROTOCOLS.map((p) => ({ label: p.label, value: p.value }))}
+            value={d.protocol}
+            onChange={(v) => set("protocol", v as never)}
+          />
         </Row>
         <Row label="Scan mode" hint={SCAN_MODES.find((s) => s.value === d.scanMode)?.hint}>
-          <select value={d.scanMode} onChange={(e) => set("scanMode", e.target.value as never)}>
-            {SCAN_MODES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
+          <Select
+            w={180}
+            data={SCAN_MODES.map((s) => ({ label: s.label, value: s.value }))}
+            value={d.scanMode}
+            onChange={(v) => v && set("scanMode", v as never)}
+          />
         </Row>
         <Row label="IP version">
-          <select value={d.ipVersion} onChange={(e) => set("ipVersion", e.target.value as never)}>
-            {IP_VERSIONS.map((v) => (
-              <option key={v.value} value={v.value}>{v.label}</option>
-            ))}
-          </select>
+          <Select
+            w={180}
+            data={IP_VERSIONS.map((v) => ({ label: v.label, value: v.value }))}
+            value={d.ipVersion}
+            onChange={(v) => v && set("ipVersion", v as never)}
+          />
         </Row>
         <Row label="Quick reconnect" hint="Reuse last good gateway when possible">
-          <input type="checkbox" checked={d.quickReconnect} onChange={(e) => set("quickReconnect", e.target.checked)} />
+          <Switch checked={d.quickReconnect} onChange={(e) => set("quickReconnect", e.currentTarget.checked)} />
         </Row>
         <Row label="Auto-connect" hint="Connect on app launch">
-          <input type="checkbox" checked={d.autoConnect} onChange={(e) => set("autoConnect", e.target.checked)} />
+          <Switch checked={d.autoConnect} onChange={(e) => set("autoConnect", e.currentTarget.checked)} />
         </Row>
         <Row
           label="Always-on core"
           hint="Keep the tunnel established — START/STOP only toggles the proxy port"
         >
-          <div className="card-row">
-            <button className={`card ${!d.alwaysOn ? "selected" : ""}`} onClick={() => set("alwaysOn", false)}>
-              Standard
-            </button>
-            <button className={`card ${d.alwaysOn ? "selected" : ""}`} onClick={() => set("alwaysOn", true)}>
-              Always-on
-            </button>
-          </div>
+          <Switch checked={d.alwaysOn} onChange={(e) => set("alwaysOn", e.currentTarget.checked)} />
         </Row>
-      </section>
+      </Section>
 
-      <section>
-        <h2>Local proxy</h2>
+      <Section title="Local proxy">
         <Row label="SOCKS5 bind address">
-          <input
-            type="text"
-            className="mono"
-            value={d.socksHost}
-            onChange={(e) => set("socksHost", e.target.value)}
-          />
-          <input
-            type="number"
-            min={1}
-            max={65535}
-            value={d.socksPort}
-            onChange={(e) => set("socksPort", Math.max(1, Math.min(65535, Number(e.target.value) || 1)))}
-          />
+          <Group gap="xs">
+            <TextInput w={140} className="mono" value={d.socksHost} onChange={(e) => set("socksHost", e.currentTarget.value)} />
+            <NumberInput {...port("socksPort")} hideControls />
+          </Group>
         </Row>
         <Row label="HTTP proxy" hint="Also expose an HTTP CONNECT proxy">
-          <input type="checkbox" checked={d.httpProxyEnabled} onChange={(e) => set("httpProxyEnabled", e.target.checked)} />
-          <input
-            type="number"
-            min={1}
-            max={65535}
-            disabled={!d.httpProxyEnabled}
-            value={d.httpProxyPort}
-            onChange={(e) => set("httpProxyPort", Math.max(1, Math.min(65535, Number(e.target.value) || 1)))}
-          />
+          <Group gap="sm">
+            <Switch checked={d.httpProxyEnabled} onChange={(e) => set("httpProxyEnabled", e.currentTarget.checked)} />
+            <NumberInput {...port("httpProxyPort")} hideControls disabled={!d.httpProxyEnabled} />
+          </Group>
         </Row>
         <Row label="Upstream proxy" hint="Dial out through another proxy (URL)">
-          <input type="text" {...opt("upstreamProxy")} placeholder="socks5://user:pass@host:port" />
+          <TextInput w={260} placeholder="socks5://user:pass@host:port" {...opt("upstreamProxy")} />
         </Row>
-      </section>
+      </Section>
 
-      <section>
-        <h2>Smart routing</h2>
+      <Section title="Smart routing">
         <Row label="Proxy mode">
-          <div className="card-row">
-            <button
-              title="Plain Aether SOCKS5, like other Aether clients"
-              className={`card ${!d.smartRouting ? "selected" : ""}`}
-              onClick={() => set("smartRouting", false)}
-            >
-              Direct proxy
-            </button>
-            <button
-              title="Route through Xray with Iran split rules and ad blocking"
-              className={`card ${d.smartRouting ? "selected" : ""}`}
-              onClick={() => set("smartRouting", true)}
-            >
-              Smart routing (Xray)
-            </button>
-          </div>
+          <SegmentedControl
+            data={[
+              { label: "Direct proxy", value: "direct" },
+              { label: "Smart (Xray)", value: "smart" },
+            ]}
+            value={d.smartRouting ? "smart" : "direct"}
+            onChange={(v) => set("smartRouting", v === "smart")}
+          />
         </Row>
         {d.smartRouting && (
           <>
             <Row label="Master SOCKS5 port" hint="Point your apps here when smart routing is on">
-              <input
-                type="number"
-                min={1}
-                max={65535}
-                value={d.xraySocksPort}
-                onChange={(e) => set("xraySocksPort", Math.max(1, Math.min(65535, Number(e.target.value) || 1)))}
-              />
+              <NumberInput {...port("xraySocksPort")} hideControls />
             </Row>
-            <p className="hint">
+            <Text size="xs" c="dimmed">
               Iranian sites and private IPs go direct, ads are blocked, everything else is
               tunneled — like Hiddify's rules.
-            </p>
+            </Text>
           </>
         )}
-      </section>
+      </Section>
 
       <details className="advanced">
         <summary>Advanced settings</summary>
 
-        <section>
-          <h2>Obfuscation</h2>
-          <Row label="Noize profile">
-            <select value={d.noizeProfile} onChange={(e) => set("noizeProfile", e.target.value)}>
-              {NOIZE_PROFILES.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </Row>
-        </section>
+        <Stack gap="md" pt="md">
+          <Section title="Obfuscation">
+            <Row label="Noize profile">
+              <Select
+                w={180}
+                data={NOIZE_PROFILES.map((n) => ({ label: n, value: n }))}
+                value={d.noizeProfile}
+                onChange={(v) => v && set("noizeProfile", v)}
+              />
+            </Row>
+          </Section>
 
-        <section>
-          <h2>MASQUE</h2>
-          <Row label="HTTP/2 fallback">
-            <input type="checkbox" checked={d.masqueH2} onChange={(e) => set("masqueH2", e.target.checked)} />
-          </Row>
-          <Row label="ECH config" hint="Empty = auto">
-            <input type="text" {...opt("ech")} placeholder="auto" />
-          </Row>
-          <Row label="TLS fragmentation">
-            <input type="checkbox" checked={d.fragment} onChange={(e) => set("fragment", e.target.checked)} />
-          </Row>
-          {d.fragment && (
-            <>
-              <Row label="Fragment size">
-                <input type="text" value={d.fragmentSize} onChange={(e) => set("fragmentSize", e.target.value)} placeholder="e.g. 32,64" />
-              </Row>
-              <Row label="Fragment delay (ms)">
-                <input type="text" value={d.fragmentDelay} onChange={(e) => set("fragmentDelay", e.target.value)} placeholder="e.g. 5" />
-              </Row>
-            </>
-          )}
-          <Row label="Skip data check">
-            <input type="checkbox" checked={d.disableDataCheck} onChange={(e) => set("disableDataCheck", e.target.checked)} />
-          </Row>
-        </section>
+          <Section title="MASQUE">
+            <Row label="HTTP/2 fallback">
+              <Switch checked={d.masqueH2} onChange={(e) => set("masqueH2", e.currentTarget.checked)} />
+            </Row>
+            <Row label="ECH config" hint="Empty = auto">
+              <TextInput w={260} placeholder="auto" {...opt("ech")} />
+            </Row>
+            <Row label="TLS fragmentation">
+              <Switch checked={d.fragment} onChange={(e) => set("fragment", e.currentTarget.checked)} />
+            </Row>
+            {d.fragment && (
+              <>
+                <Row label="Fragment size">
+                  <TextInput w={260} value={d.fragmentSize} onChange={(e) => set("fragmentSize", e.currentTarget.value)} placeholder="e.g. 32,64" />
+                </Row>
+                <Row label="Fragment delay (ms)">
+                  <TextInput w={260} value={d.fragmentDelay} onChange={(e) => set("fragmentDelay", e.currentTarget.value)} placeholder="e.g. 5" />
+                </Row>
+              </>
+            )}
+            <Row label="Skip data check">
+              <Switch checked={d.disableDataCheck} onChange={(e) => set("disableDataCheck", e.currentTarget.checked)} />
+            </Row>
+          </Section>
 
-        <section>
-          <h2>WireGuard</h2>
-          <Row label="Keepalive (secs)">
-            <input type="number" min={0} {...num("keepaliveSecs")} />
-          </Row>
-          <Row label="No profile retry">
-            <input type="checkbox" checked={d.noProfileRetry} onChange={(e) => set("noProfileRetry", e.target.checked)} />
-          </Row>
-          <Row label="Forced peer">
-            <input type="text" {...opt("forcedPeer")} />
-          </Row>
-          <Row label="Forced WG peer">
-            <input type="text" {...opt("forcedWgPeer")} />
-          </Row>
-        </section>
+          <Section title="WireGuard">
+            <Row label="Keepalive (secs)">
+              <NumberInput {...num("keepaliveSecs")} w={110} hideControls />
+            </Row>
+            <Row label="No profile retry">
+              <Switch checked={d.noProfileRetry} onChange={(e) => set("noProfileRetry", e.currentTarget.checked)} />
+            </Row>
+            <Row label="Forced peer">
+              <TextInput w={260} {...opt("forcedPeer")} />
+            </Row>
+            <Row label="Forced WG peer">
+              <TextInput w={260} {...opt("forcedWgPeer")} />
+            </Row>
+          </Section>
 
-        <section>
-          <h2>Cloudflare Zero Trust</h2>
-          <Row label="Team name">
-            <input type="text" {...opt("teamName")} />
-          </Row>
-          <Row label="Access client ID">
-            <input type="text" {...opt("accessClientId")} />
-          </Row>
-          <Row label="Access client secret">
-            <input type="password" {...opt("accessClientSecret")} />
-          </Row>
-          <Row label="Access token">
-            <input type="password" {...opt("accessToken")} />
-          </Row>
-          <Row label="Use gateway proxy">
-            <input type="checkbox" checked={d.useGatewayProxy} onChange={(e) => set("useGatewayProxy", e.target.checked)} />
-          </Row>
-        </section>
+          <Section title="Cloudflare Zero Trust">
+            <Row label="Team name">
+              <TextInput w={260} {...opt("teamName")} />
+            </Row>
+            <Row label="Access client ID">
+              <TextInput w={260} {...opt("accessClientId")} />
+            </Row>
+            <Row label="Access client secret">
+              <PasswordInput w={260} {...opt("accessClientSecret")} />
+            </Row>
+            <Row label="Access token">
+              <PasswordInput w={260} {...opt("accessToken")} />
+            </Row>
+            <Row label="Use gateway proxy">
+              <Switch checked={d.useGatewayProxy} onChange={(e) => set("useGatewayProxy", e.currentTarget.checked)} />
+            </Row>
+          </Section>
 
-        <section>
-          <h2>Network tuning</h2>
-          <Row label="DNS resolvers">
-            <input type="text" value={d.dnsResolvers} onChange={(e) => set("dnsResolvers", e.target.value)} />
-          </Row>
-          <Row label="Validate timeout (secs)">
-            <input type="number" min={0} {...num("validateSecs")} />
-          </Row>
-          <Row label="Startup timeout (secs)">
-            <input type="number" min={0} {...num("startupSecs")} />
-          </Row>
-          <Row label="Reconnect delay (secs)">
-            <input type="number" min={0} {...num("reconnectSecs")} />
-          </Row>
-          <Row label="Route block" hint="CIDRs to send through tunnel">
-            <input type="text" {...opt("routeBlock")} />
-          </Row>
-          <Row label="Route direct" hint="CIDRs to bypass tunnel">
-            <input type="text" {...opt("routeDirect")} />
-          </Row>
-          <Row label="Perf profile">
-            <input type="text" {...opt("perfProfile")} />
-          </Row>
-          <Row label="TLS groups">
-            <input type="text" {...opt("tlsGroups")} />
-          </Row>
-        </section>
+          <Section title="Network tuning">
+            <Row label="DNS resolvers">
+              <TextInput w={260} value={d.dnsResolvers} onChange={(e) => set("dnsResolvers", e.currentTarget.value)} />
+            </Row>
+            <Row label="Validate timeout (secs)">
+              <NumberInput {...num("validateSecs")} w={110} hideControls />
+            </Row>
+            <Row label="Startup timeout (secs)">
+              <NumberInput {...num("startupSecs")} w={110} hideControls />
+            </Row>
+            <Row label="Reconnect delay (secs)">
+              <NumberInput {...num("reconnectSecs")} w={110} hideControls />
+            </Row>
+            <Row label="Route block" hint="CIDRs to send through tunnel">
+              <TextInput w={260} {...opt("routeBlock")} />
+            </Row>
+            <Row label="Route direct" hint="CIDRs to bypass tunnel">
+              <TextInput w={260} {...opt("routeDirect")} />
+            </Row>
+            <Row label="Perf profile">
+              <TextInput w={260} {...opt("perfProfile")} />
+            </Row>
+            <Row label="TLS groups">
+              <TextInput w={260} {...opt("tlsGroups")} />
+            </Row>
+          </Section>
 
-        <section>
-          <h2>App</h2>
-          <Row label="Log level">
-            <select value={d.logLevel} onChange={(e) => set("logLevel", e.target.value as never)}>
-              {LOG_LEVELS.map((l) => (
-                <option key={l.value} value={l.value}>{l.label}</option>
-              ))}
-            </select>
-          </Row>
-        </section>
+          <Section title="App">
+            <Row label="Log level">
+              <Select
+                w={180}
+                data={LOG_LEVELS.map((l) => ({ label: l.label, value: l.value }))}
+                value={d.logLevel}
+                onChange={(v) => v && set("logLevel", v as never)}
+              />
+            </Row>
+          </Section>
+        </Stack>
       </details>
 
-      <footer className="settings-footer">
-        <button
-          className="primary"
+      <Group justify="center" gap="md" className="settings-footer">
+        <Button
+          variant="default"
           onClick={() => api.getSettings().then(setDraft).catch(() => {}).then(() => setSaved(false))}
         >
-          RESET
-        </button>
-        <span className="spacer" />
-        {error && <span className="err">{error}</span>}
-        {saved && !error && <span className="ok">saved ✓</span>}
-        <button className="primary" onClick={save}>
-          SAVE
-        </button>
-      </footer>
-    </div>
+          Reset
+        </Button>
+        {error && <Text c="red" size="sm" maw={280}>{error}</Text>}
+        {saved && !error && <Badge color="green" variant="light">saved</Badge>}
+        <Button onClick={save}>Save</Button>
+      </Group>
+    </Stack>
   );
 }

@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import { Badge, Button, Select, Switch } from "@mantine/core";
 import { api, onLog, type LogRecord } from "../api";
 
 const LEVELS = ["all", "error", "warn", "info", "debug", "trace"];
 const RENDER_CAP = 800;
+
+const LEVEL_COLOR: Record<string, string> = {
+  error: "red",
+  warn: "yellow",
+  info: "grape",
+  debug: "cyan",
+  trace: "gray",
+};
 
 export default function Logs() {
   const [filter, setFilter] = useState("all");
@@ -47,43 +56,54 @@ export default function Logs() {
   return (
     <div className="logs">
       <div className="logs-toolbar">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          {LEVELS.map((l) => (
-            <option key={l} value={l}>
-              {l.toUpperCase()}
-            </option>
-          ))}
-        </select>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={autoscroll}
-            onChange={(e) => setAutoscroll(e.target.checked)}
-          />
-          auto-scroll
-        </label>
+        <Select
+          w={120}
+          data={LEVELS.map((l) => ({ label: l.toUpperCase(), value: l }))}
+          value={filter}
+          onChange={(v) => v && setFilter(v)}
+        />
+        <Switch
+          size="sm"
+          label="Auto-scroll"
+          labelPosition="left"
+          checked={autoscroll}
+          onChange={(e) => setAutoscroll(e.currentTarget.checked)}
+        />
         <span className="spacer" />
-        <button className="mini-btn" onClick={() => api.copyText(buffer.current.map(fmt).join("\n")).catch(() => {})}>
-          COPY ALL
-        </button>
-        <button
-          className="mini-btn"
+        <Button
+          size="compact-sm"
+          variant="default"
+          onClick={() => api.copyText(buffer.current.map(fmt).join("\n")).catch(() => {})}
+        >
+          Copy all
+        </Button>
+        <Button
+          size="compact-sm"
+          variant="light"
+          color="red"
           onClick={() => {
             api.clearLogs().catch(() => {});
             buffer.current = [];
             force((n) => n + 1);
           }}
         >
-          CLEAR
-        </button>
+          Clear
+        </Button>
       </div>
 
       <div className="log-list mono" ref={listEl}>
         {shown.map((r, i) => (
-          <div key={i} className={`log-line level-${r.level}`}>
+          <div key={i} className="log-line">
             <span className="log-ts">{ts(r.tsMs)}</span>
-            <span className="log-level">{r.level.toUpperCase().padEnd(5)}</span>
-            <span className="log-msg">{r.message}</span>
+            <Badge
+              size="xs"
+              variant="light"
+              color={LEVEL_COLOR[r.level] ?? "gray"}
+              className="log-level-badge"
+            >
+              {r.level.toUpperCase()}
+            </Badge>
+            <span className="log-msg"> {r.message}</span>
           </div>
         ))}
         {shown.length === 0 && <div className="log-empty">no log lines</div>}
