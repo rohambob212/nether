@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Group,
@@ -57,19 +58,45 @@ function Row({
 
 export default function Settings() {
   const [draft, setDraft] = useState<NetherSettings | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const savedJson = useRef<string | null>(null);
+  const loaded = useRef(false);
 
   useEffect(() => {
-    api.getSettings().then(setDraft).catch(() => setDraft(DEFAULT_SETTINGS));
+    api.getSettings().then((s) => {
+      savedJson.current = JSON.stringify(s);
+      setDraft(s);
+      loaded.current = true;
+    }).catch(() => setDraft(DEFAULT_SETTINGS));
   }, []);
+
+  // Auto-save: debounce every change, no save button to babysit.
+  useEffect(() => {
+    if (!draft || !loaded.current) return;
+    const json = JSON.stringify(draft);
+    if (json === savedJson.current) return;
+    setSaveState("saving");
+    const id = setTimeout(async () => {
+      try {
+        const normalized = await api.saveSettings(draft);
+        savedJson.current = JSON.stringify(normalized);
+        setDraft(normalized);
+        setSaveState("saved");
+        setError("");
+      } catch (e) {
+        setSaveState("error");
+        setError(String(e));
+      }
+    }, 600);
+    return () => clearTimeout(id);
+  }, [draft]);
 
   if (!draft) return <Text c="dimmed" ta="center" pt="xl">loading…</Text>;
   const d = draft;
 
   function set<K extends keyof NetherSettings>(key: K, value: NetherSettings[K]) {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
-    setSaved(false);
   }
 
   // Text inputs bind as strings; empty becomes null for optional fields.
@@ -100,19 +127,30 @@ export default function Settings() {
     };
   }
 
-  async function save() {
+  async function reset() {
+    if (!confirm("Reset all settings to defaults?")) return;
     try {
-      const normalized = await api.saveSettings(draft!);
+      const normalized = await api.saveSettings(DEFAULT_SETTINGS);
+      savedJson.current = JSON.stringify(normalized);
       setDraft(normalized);
-      setSaved(true);
-      setError("");
+      setSaveState("saved");
     } catch (e) {
+      setSaveState("error");
       setError(String(e));
     }
   }
 
   return (
-    <Stack gap="md" maw={680} mx="auto" p="md" pb={40}>
+    <Stack gap="md" maw={680} mx="auto" p="md" pb={48}>
+      <Group justify="center" gap="xs" mih={22}>
+        {saveState === "saving" && <Badge size="sm" color="grape" variant="light">saving…</Badge>}
+        {saveState === "saved" && <Badge size="sm" color="green" variant="light">saved</Badge>}
+        {saveState === "error" && <Badge size="sm" color="red" variant="light">save failed</Badge>}
+      </Group>
+      {saveState === "error" && (
+        <Alert variant="light" color="red" fz="sm">{error}</Alert>
+      )}
+
       <Section title="Connection">
         <Row label="Protocol">
           <SegmentedControl
@@ -303,20 +341,12 @@ export default function Settings() {
               />
             </Row>
           </Section>
+
+          <Button variant="subtle" color="red" onClick={reset}>
+            Reset all settings to defaults
+          </Button>
         </Stack>
       </details>
-
-      <Group justify="center" gap="md" className="settings-footer">
-        <Button
-          variant="default"
-          onClick={() => api.getSettings().then(setDraft).catch(() => {}).then(() => setSaved(false))}
-        >
-          Reset
-        </Button>
-        {error && <Text c="red" size="sm" maw={280}>{error}</Text>}
-        {saved && !error && <Badge color="green" variant="light">saved</Badge>}
-        <Button onClick={save}>Save</Button>
-      </Group>
     </Stack>
   );
 }

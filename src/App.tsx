@@ -64,6 +64,8 @@ export default function App() {
     }
   }
 
+  // All views stay mounted so switching tabs keeps their state (settings
+  // draft, log scroll) and never remount-janks. CSS animates the swap.
   return (
     <div className="app">
       <header className="titlebar">
@@ -75,16 +77,20 @@ export default function App() {
       </header>
 
       <main className="content">
-        {tab === "home" && (
+        <div className="view" data-active={tab === "home"}>
           <Home
             status={status}
             busy={busy}
             onToggle={toggle}
             onOpenSettings={() => setTab("settings")}
           />
-        )}
-        {tab === "logs" && <Logs />}
-        {tab === "settings" && <Settings />}
+        </div>
+        <div className="view" data-active={tab === "logs"}>
+          <Logs />
+        </div>
+        <div className="view" data-active={tab === "settings"}>
+          <Settings />
+        </div>
       </main>
 
       <nav className="tabs">

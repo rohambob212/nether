@@ -1,16 +1,15 @@
 :root {
   --bg: #0a0510;
   --bg-panel: #140b21;
-  --bg-raised: #1c1130;
   --portal: #a06ee8;
   --portal-bright: #c39bff;
   --portal-dim: #5b3a8f;
   --portal-glow: rgba(160, 110, 232, 0.45);
   --green: #4ade80;
-  --red: #f87171;
   --text: #ece5f8;
   --text-dim: #9d8db8;
   --border: #2c1c47;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -85,103 +84,129 @@ body {
   border-radius: 50%;
   background: var(--text-dim);
   flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
 }
 .state-dot.connected { background: var(--green); box-shadow: 0 0 10px var(--green); }
 .state-dot.connecting,
 .state-dot.disconnecting { background: var(--portal); animation: pulse 1s infinite; }
 
-/* ---- layout ---- */
+/* ---- layout: views stay mounted, swap is animated ---- */
 .content {
   flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.view[data-active="false"] { display: none; }
+.view[data-active="true"] { animation: view-in 0.22s var(--ease); }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ---- bottom tabs ---- */
 .tabs {
   display: flex;
   border-top: 1px solid var(--border);
+  background: #0d0716;
   padding-bottom: env(safe-area-inset-bottom);
   flex-shrink: 0;
 }
 .tab-btn {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
-  padding: 9px 0 7px;
-  min-height: 60px;
+  min-height: 62px;
   color: var(--text-dim);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1px;
-  transition: color 0.15s;
+  letter-spacing: 0.5px;
+  transition: color 0.2s var(--ease);
 }
-.tab-btn svg { opacity: 0.85; }
-.tab-btn.active {
-  color: var(--portal-bright);
+.tab-btn::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(160, 110, 232, 0.15);
+  transform: translateX(-50%) scale(0.4);
+  opacity: 0;
+  transition: transform 0.25s var(--ease), opacity 0.2s var(--ease);
+}
+.tab-btn svg,
+.tab-btn span {
+  position: relative;
+  z-index: 1;
+}
+.tab-btn.active { color: var(--portal-bright); }
+.tab-btn.active::before {
+  transform: translateX(-50%) scale(1);
+  opacity: 1;
 }
 .tab-btn.active svg {
-  opacity: 1;
   filter: drop-shadow(0 0 6px var(--portal-glow));
 }
-.tab-btn:hover { color: var(--text); }
+.tab-btn:active svg { transform: scale(0.88); transition: transform 0.12s; }
 
-/* ---- home: the portal button ---- */
-.portal-btn {
-  width: clamp(180px, 58vw, 240px);
+/* ---- home: power button ---- */
+.power-btn {
+  width: clamp(140px, 44vw, 170px);
   aspect-ratio: 1;
+  border-radius: 50%;
   border: 3px solid var(--portal-dim);
-  border-radius: 26px;
-  background: var(--bg-panel);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(160, 110, 232, 0.22), rgba(20, 11, 33, 0.9) 70%);
+  color: var(--portal-bright);
   cursor: pointer;
-  padding: 14px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  transition: border-color 0.25s, box-shadow 0.25s, transform 0.1s;
+  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease),
+    color 0.3s var(--ease), transform 0.12s var(--ease);
   box-shadow:
-    0 0 28px var(--portal-glow),
-    inset 0 0 28px rgba(160, 110, 232, 0.12);
-  color: var(--text);
+    0 0 34px var(--portal-glow),
+    inset 0 0 30px rgba(160, 110, 232, 0.14);
 }
-.portal-btn:active:not(:disabled) { transform: scale(0.97); }
-.portal-btn:hover:not(:disabled) {
+.power-btn:active:not(:disabled) { transform: scale(0.95); }
+.power-btn:hover:not(:disabled) {
   border-color: var(--portal);
   box-shadow:
-    0 0 48px var(--portal-glow),
-    inset 0 0 36px rgba(160, 110, 232, 0.22);
+    0 0 52px var(--portal-glow),
+    inset 0 0 40px rgba(160, 110, 232, 0.22);
 }
-.portal-btn img {
-  width: 72%;
-  image-rendering: pixelated;
-  border-radius: 10px;
-}
-.portal-btn .portal-label {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 3px;
-}
-.portal-btn.connecting,
-.portal-btn.disconnecting {
+.power-btn.connecting,
+.power-btn.disconnecting {
   border-color: var(--portal);
-  animation: pulse 1.2s infinite;
+  animation: pulse 1.3s infinite;
+  cursor: default;
 }
-.portal-btn.connected {
+.power-btn.connected {
   border-color: var(--green);
+  color: var(--green);
   box-shadow:
-    0 0 36px rgba(74, 222, 128, 0.35),
-    inset 0 0 30px rgba(74, 222, 128, 0.14);
+    0 0 40px rgba(74, 222, 128, 0.32),
+    inset 0 0 32px rgba(74, 222, 128, 0.14);
 }
-.portal-btn.connected .portal-label { color: var(--green); }
-.portal-btn:disabled { cursor: default; }
+.power-btn:disabled { cursor: default; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  50% { opacity: 0.6; }
 }
 
 /* ---- settings ---- */
@@ -193,27 +218,18 @@ body {
 }
 .advanced[open] summary { padding-bottom: 0; }
 
-.settings-footer {
-  position: sticky;
-  bottom: 0;
-  margin: 8px -16px -24px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: color-mix(in srgb, #0a0510 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border);
-}
-
 /* ---- logs ---- */
 .logs {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .logs-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }

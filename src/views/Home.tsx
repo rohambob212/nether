@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Badge, Code, CopyButton, Group, Paper, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Code, CopyButton, Group, Loader, Paper, Stack, Text } from "@mantine/core";
 import { api, type EngineStatus, type NetherSettings } from "../api";
 
 function formatUptime(sinceMs: number): string {
@@ -15,6 +15,23 @@ const BADGE_COLOR: Record<string, string> = {
   disconnecting: "grape",
   disconnected: "gray",
 };
+
+function PowerIcon({ size = 44 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.1}
+      strokeLinecap="round"
+    >
+      <path d="M12 2.5v9" />
+      <path d="M17.6 5.6a8.5 8.5 0 1 1-11.2 0" />
+    </svg>
+  );
+}
 
 export default function Home({
   status,
@@ -72,7 +89,7 @@ export default function Home({
                 onClick={copy}
                 style={{ background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}
               >
-                {copied ? "COPIED" : "COPY"}
+                {copied ? "Copied" : "Copy"}
               </Text>
             )}
           </CopyButton>
@@ -83,21 +100,25 @@ export default function Home({
 
   return (
     <Stack align="center" gap="lg" pt="xl" pb="xl" px="md" maw={640} mx="auto">
-      <button className={`portal-btn ${status.state}`} onClick={onToggle} disabled={busy}>
-        <img src="/portal.png" alt="" />
-        <span className="portal-label">
-          {connected ? "DISCONNECT" : busy ? "…" : "CONNECT"}
-        </span>
-      </button>
+      <Stack align="center" gap="md" pt="sm">
+        <button
+          className={`power-btn ${status.state}`}
+          onClick={onToggle}
+          disabled={busy}
+          aria-label={connected ? "Disconnect" : "Connect"}
+        >
+          {busy ? <Loader size={38} type="dots" color="currentColor" /> : <PowerIcon />}
+        </button>
 
-      <Group gap="sm">
-        <Badge size="lg" variant="light" color={BADGE_COLOR[status.state]} tt="capitalize">
-          {label}
-        </Badge>
-        {uptime && (
-          <Text size="sm" c="dimmed" ff="monospace">{uptime}</Text>
-        )}
-      </Group>
+        <Group gap="xs">
+          <Badge size="lg" variant="light" color={BADGE_COLOR[status.state]} tt="capitalize">
+            {label}
+          </Badge>
+          {uptime && (
+            <Text size="sm" c="dimmed" ff="monospace">{uptime}</Text>
+          )}
+        </Group>
+      </Stack>
 
       {(masterAddr ?? tunnelAddr) && (
         <Stack gap="sm" w="100%">
@@ -121,7 +142,6 @@ export default function Home({
           w="100%"
           variant="light"
           color={errored ? "red" : "grape"}
-          icon={errored ? "✕" : "ℹ"}
           ff="monospace"
           fz="sm"
         >
@@ -130,11 +150,16 @@ export default function Home({
       )}
 
       <Text size="sm" c="dimmed" ta="center" maw={420}>
-        Route your apps through the SOCKS5 proxy above. Tune the connection in{" "}
-        <Text component="a" href="#" c="grape.3" onClick={(e) => { e.preventDefault(); onOpenSettings(); }} style={{ textDecoration: "none" }}>
-          Settings
-        </Text>
-        .
+        {connected || busy ? (
+          <>Route your apps through the proxy above. Tune the connection in{" "}
+            <Text component="a" href="#" c="grape.3" onClick={(e) => { e.preventDefault(); onOpenSettings(); }} style={{ textDecoration: "none" }}>
+              Settings
+            </Text>
+            .
+          </>
+        ) : (
+          <>Tap the power button to open the tunnel, then route your apps through the proxy above.</>
+        )}
       </Text>
     </Stack>
   );

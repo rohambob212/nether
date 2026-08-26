@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Select, Switch } from "@mantine/core";
+import { ActionIcon, Badge, SegmentedControl, Switch, Tooltip } from "@mantine/core";
 import { api, onLog, type LogRecord } from "../api";
 
 const LEVELS = ["all", "error", "warn", "info", "debug", "trace"];
@@ -56,39 +56,47 @@ export default function Logs() {
   return (
     <div className="logs">
       <div className="logs-toolbar">
-        <Select
-          w={120}
+        <SegmentedControl
+          size="xs"
           data={LEVELS.map((l) => ({ label: l.toUpperCase(), value: l }))}
           value={filter}
-          onChange={(v) => v && setFilter(v)}
-        />
-        <Switch
-          size="sm"
-          label="Auto-scroll"
-          labelPosition="left"
-          checked={autoscroll}
-          onChange={(e) => setAutoscroll(e.currentTarget.checked)}
+          onChange={(v) => setFilter(v)}
         />
         <span className="spacer" />
-        <Button
-          size="compact-sm"
+        <Tooltip label="Auto-scroll">
+          <Switch
+            size="sm"
+            checked={autoscroll}
+            onChange={(e) => setAutoscroll(e.currentTarget.checked)}
+          />
+        </Tooltip>
+        <ActionIcon
           variant="default"
+          size="lg"
+          aria-label="Copy all"
           onClick={() => api.copyText(buffer.current.map(fmt).join("\n")).catch(() => {})}
         >
-          Copy all
-        </Button>
-        <Button
-          size="compact-sm"
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </ActionIcon>
+        <ActionIcon
           variant="light"
           color="red"
+          size="lg"
+          aria-label="Clear"
           onClick={() => {
             api.clearLogs().catch(() => {});
             buffer.current = [];
             force((n) => n + 1);
           }}
         >
-          Clear
-        </Button>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </ActionIcon>
       </div>
 
       <div className="log-list mono" ref={listEl}>

@@ -32,10 +32,13 @@ impl LogRecord {
 
 /// Broadcasts every engine log line to subscribers (the UI and the status
 /// watcher) while keeping a bounded in-memory history for late joiners.
+/// Consecutive duplicate lines are collapsed into one with a `×N` counter so
+/// a chatty source can't flood the UI.
 pub struct LogHub {
     tx: tokio::sync::broadcast::Sender<LogRecord>,
     history: std::sync::Mutex<Vec<LogRecord>>,
     cap: usize,
+    last: std::sync::Mutex<Option<(String, u64)>>,
 }
 
 static HUB: std::sync::OnceLock<LogHub> = std::sync::OnceLock::new();
@@ -45,6 +48,7 @@ fn init_hub(capacity: usize) -> LogHub {
         tx: tokio::sync::broadcast::channel(4096).0,
         history: std::sync::Mutex::new(Vec::with_capacity(1024)),
         cap: capacity.max(100),
+        last: std::sync::Mutex::new(None),
     }
 }
 
@@ -80,9 +84,28 @@ impl LogHub {
 
     pub fn clear(&self) {
         self.history.lock().unwrap_or_else(|p| p.into_inner()).clear();
+        *self.last.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
 
     fn push(&self, rec: LogRecord) {
+        {
+            // Collapse consecutive duplicates: rewrite the stored line with a
+            // ×N counter instead of appending identical records.
+            let mut last = self.last.lock().unwrap_or_else(|p| p.into_inner());
+            let key = format!("{}|{}", rec.target, rec.message);
+            if let Some((prev, count)) = last.as_mut() {
+                if *prev == key {
+                    *count += 1;
+                    let mut hist = self.history.lock().unwrap_or_else(|p| p.into_inner());
+                    if let Some(l) = hist.last_mut() {
+                        l.message = format!("{} (×{})", rec.message, *count + 1);
+                    }
+                    return;
+                }
+            }
+            *last = Some((key, 0));
+        }
+
         {
             let mut hist = self.history.lock().unwrap_or_else(|p| p.into_inner());
             if hist.len() >= self.cap {
