@@ -50,24 +50,32 @@ jobs:
       - name: Apply launcher icon
         run: npm run tauri icon icons/nether-1024.png
 
-      - name: Build signed APKs (arm64 + armv7)
+      - name: Build and sign APK
         run: |
           keytool -genkeypair -v \
             -keystore ci.jks -storepass nether-ci \
             -alias nether -keypass nether-ci \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Nether CI, OU=Nether, O=Nether, L=Internet, C=US"
-          # Consumed by the generated app/build.gradle.kts release signingConfig.
-          printf 'storeFile=%s/ci.jks\nstorePassword=nether-ci\nkeyAlias=nether\nkeyPassword=nether-ci\n' \
-            "$GITHUB_WORKSPACE" > src-tauri/gen/android/keystore.properties
           npm run tauri android build -- --apk --target aarch64 --target armv7
+          # The generated gradle project has no release signingConfig, so sign
+          # here: universal APK already packs both ABIs.
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          OUT=src-tauri/gen/android/app/build/outputs/apk/universal/release
+          "$BT/zipalign" -f -p 4 "$OUT/app-universal-release-unsigned.apk" "$OUT/Nether.apk"
+          "$BT/apksigner" sign \
+            --ks ci.jks --ks-key-alias nether \
+            --ks-pass pass:nether-ci --key-pass pass:nether-ci \
+            "$OUT/Nether.apk"
+          "$BT/apksigner" verify "$OUT/Nether.apk"
+          rm -f "$OUT/app-universal-release-unsigned.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: nether-android-arm64
+          name: nether-android
           if-no-files-found: error
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          path: src-tauri/gen/android/app/build/outputs/apk/universal/release/Nether.apk
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
