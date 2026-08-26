@@ -23,7 +23,7 @@ fi
 
 case "$HOST" in
   *linux*)   ASSET_OS="linux-64";  [[ "$HOST" == aarch64* ]] && ASSET_OS="linux-arm64-v8a"; EXT="zip" ;;
-  *darwin*)  ASSET_OS="macos-dmg"; [[ "$HOST" == aarch64* ]] && ASSET_OS="macos-arm64-dmg"; EXT="zip" ;;
+  *darwin*)  ASSET_OS="macos-64"; [[ "$HOST" == aarch64* ]] && ASSET_OS="macos-arm64-v8a"; EXT="zip" ;;
   *windows*) ASSET_OS="windows-64"; EXT="zip" ;;
   *) echo "unsupported target $HOST" >&2; exit 1 ;;
 esac
